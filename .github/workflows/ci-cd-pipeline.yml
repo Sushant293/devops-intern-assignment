@@ -1,0 +1,48 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - feature/devops-intern
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          # Assuming there are tests
+          # python -m unittest discover
+
+      - name: Deploy to EC2
+        env:
+          EC2_USER: ubuntu
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          echo "${SSH_PRIVATE_KEY}" > key.pem
+          chmod 400 key.pem
+          scp -i key.pem -o StrictHostKeyChecking=no -r * ${EC2_USER}@${EC2_HOST}:/home/ubuntu/flask-app
+          ssh -i key.pem -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_HOST} "sudo systemctl restart flask-app"
+
+      - name: Update S3 Bucket
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          aws s3 cp your_static_file.txt s3://devops-intern-assignment-[your_name]/ --acl public-read
